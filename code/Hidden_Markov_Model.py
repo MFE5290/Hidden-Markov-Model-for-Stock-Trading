@@ -16,6 +16,7 @@ import datetime
 import json
 import seaborn as sns
 import joblib
+import pathlib
 
 sns.set()
 
@@ -109,29 +110,34 @@ def compare_hidden_states(hmm_model, cols_features, conf_interval, iters=1000):
 
 
 # ### Downloading data and plot
+df_data_path = pathlib.Path.cwd() / ".." / "data" / "CSI300.csv"
+
 
 start_date_string = '2014-04-01'
-asset = 'BITFINEX/BTCUSD'
-column_price = 'Last'
-column_high = 'High'
-column_low = 'Low'
-column_volume = 'Volume'
+asset = 'CSI 300'
+column_price = 'close'
+column_high = 'high'
+column_low = 'low'
+column_volume = 'volume'
 
-quandl.ApiConfig.api_key = '3Rt-DUmq8LCQ9AkPi22g'
-dataset = quandl.get(asset, collapse='daily',
-                     trim_start=start_date_string)
+# quandl.ApiConfig.api_key = '3Rt-DUmq8LCQ9AkPi22g'
+# dataset = quandl.get(asset, collapse='daily',
+#                      trim_start=start_date_string)
+
+dataset = pd.read_csv(df_data_path, index_col='date', parse_dates=True)
+print(dataset.head())
 dataset = dataset.shift(1)
 print(dataset.columns)
 
 plt.figure(figsize=(20, 10))
 plt.plot(dataset[column_price])
 plt.title(asset)
-plt.show()
+# plt.show()
 
 plt.figure(figsize=(20, 10))
 plt.plot(dataset[column_volume])
 plt.title(asset)
-plt.show()
+# plt.show()
 
 
 # ### Let's generate the features and look at them
@@ -159,7 +165,7 @@ dataset = dataset.replace([np.inf, -np.inf], np.nan)
 dataset = dataset.dropna()
 
 # Split the data on sets
-train_ind = int(np.where(dataset.index == '2018-01-01 00:00:00')[0])
+train_ind = int(np.where(dataset.index == '2018-01-02')[0])
 train_set = dataset[cols_features].values[:train_ind]
 test_set = dataset[cols_features].values[train_ind:]
 
