@@ -4,7 +4,7 @@
 # ### Libraries
 
 import warnings
-import quandl
+# import quandl
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -178,12 +178,12 @@ for i in range(0, len(cols_features)):
     axs[i].set_title(cols_features[i])
     axs[i].grid(True)
 
-plt.tight_layout()
+# plt.tight_layout()
 
 # ### Modeling
 
 
-model = get_best_hmm_model(X=train_set, max_states=3, max_iter=1000000)
+model = get_best_hmm_model(X=train_set, max_states=10, max_iter=1000000)
 print("Best model with {0} states ".format(str(model.n_components)))
 
 
