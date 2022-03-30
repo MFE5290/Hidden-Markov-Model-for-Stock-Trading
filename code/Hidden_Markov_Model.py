@@ -109,11 +109,9 @@ def compare_hidden_states(hmm_model, cols_features, conf_interval, iters=1000):
     plt.tight_layout()
 
 
-# ### Downloading data and plot
+# ### load data and plot
 df_data_path = pathlib.Path.cwd() / ".." / "data" / "CSI300.csv"
-
-
-start_date_string = '2014-04-01'
+# start_date_string = '2014-04-01'
 asset = 'CSI 300'
 column_price = 'close'
 column_high = 'high'
@@ -127,6 +125,7 @@ column_volume = 'volume'
 dataset = pd.read_csv(df_data_path, index_col='date', parse_dates=True)
 print(dataset.head())
 dataset = dataset.shift(1)
+print(dataset.head())
 print(dataset.columns)
 
 plt.figure(figsize=(20, 10))
@@ -149,7 +148,7 @@ ma_period = 10
 price_deviation_period = 10
 volume_deviation_period = 10
 
-# Create features
+# Create features  /////这部分需要重新构造
 cols_features = ['last_return', 'std_normalized', 'ma_ratio', 'price_deviation', 'volume_deviation']
 dataset['last_return'] = dataset[column_price].pct_change()
 dataset['std_normalized'] = dataset[column_price].rolling(std_period).apply(std_normalized)
@@ -183,8 +182,16 @@ for i in range(0, len(cols_features)):
 # ### Modeling
 
 
-model = get_best_hmm_model(X=train_set, max_states=10, max_iter=1000000)
+model = get_best_hmm_model(X=train_set, max_states=6, max_iter=1000000)
 print("Best model with {0} states ".format(str(model.n_components)))
+
+print('The number of Hidden States', model.n_components)
+print('Mean matrix')
+print(model.means_)
+print('Covariance matrix')
+print(model.covars_)
+print('Transition matrix')
+print(model.transmat_)
 
 
 # ### Lets look at state and the next market movement
