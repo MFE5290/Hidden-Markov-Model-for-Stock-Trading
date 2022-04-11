@@ -102,8 +102,8 @@ def compare_hidden_states(hmm_model, cols_features, conf_interval, iters=1000):
 
         for k in range(0, len(mc_df.columns)):
             axs[k][i].hist(mc_df[cols_features[k]], color=colours[i])
-            axs[k][i].set_title(cols_features[k] + " (state " + str(i) + "): " +
-                                str(np.round(mean_confidence_interval(mc_df[cols_features[k]], conf_interval), 3)))
+            axs[k][i].set_title(cols_features[k] + " (state " + str(i) + "): \
+                " + str(np.round(mean_confidence_interval(mc_df[cols_features[k]], conf_interval), 3)))
             axs[k][i].grid(True)
 
     plt.tight_layout()
@@ -120,25 +120,20 @@ start_date = datetime.datetime(2005, 4, 8)
 end_date = datetime.datetime(2021, 12, 31)
 dataset = obtain_prices_df(df_data_path, start_date, end_date)
 
-
-# dataset = pd.read_csv(df_data_path, index_col=0, parse_dates=True)
-# dataset = dataset.shift(1)
-# print(dataset.columns)
-
-fig = plt.figure(figsize=(20, 10))
-ax = fig.add_subplot(1, 1, 1)
-ax.plot(dataset["close"])
-plt.xticks(fontsize=20)
-plt.yticks(fontsize=20)
-ax.set_title('Close Price CSI300', fontsize=30)
-
-fig = plt.figure(figsize=(20, 10))
-ax = fig.add_subplot(1, 1, 1)
-ax.plot(dataset["volume"])
-plt.xticks(fontsize=20)
-plt.yticks(fontsize=20)
-ax.set_title('Volume CSI300', fontsize=30)
-# plt.show()
+if (0==1):
+    fig = plt.figure(figsize=(20, 10))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(dataset["close"])
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    ax.set_title('Close Price CSI300', fontsize=30)
+    
+    fig = plt.figure(figsize=(20, 10))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(dataset["volume"])
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    ax.set_title('Volume CSI300', fontsize=30)
 
 
 # ### Let's generate the features and look at them
@@ -150,7 +145,8 @@ ma_period = 10
 price_deviation_period = 10
 volume_deviation_period = 10
 
-hold_period = 10  # 持仓周期
+hold_period = 8  # 持仓周期
+partial_period = 4
 # 计算日收益率
 dataset['return'] = dataset["close"].pct_change()
 
@@ -158,22 +154,22 @@ dataset['return'] = dataset["close"].pct_change()
 dataset['hold_return'] = dataset['return'].rolling(hold_period).mean()
 
 # 计算持仓前5日平均收益率
-dataset['5_days_return'] = dataset['return'].rolling(5).mean().shift(hold_period - 5)
+dataset['5_days_return'] = dataset['return'].rolling(partial_period).mean().shift(hold_period - partial_period)
 
 # # 计算持仓前5日和持仓期的平均成交量之比
 # dataset['volume_ratio'] = dataset[column_volume].rolling(
 #     5).mean().shift(hold_period-5) / dataset[column_volume].rolling(hold_period).mean()
 
-# 计算持仓后5日和持仓期的平均成交量之比，结果应该跟上一个没太大差别
+# 计算持仓后5日和持仓期的平均成交量之比，结果应该跟上一个没明显差别
 dataset['volume_ratio'] = dataset["volume"].rolling(
-    5).mean() / dataset["volume"].rolling(hold_period).mean()
+    partial_period).mean() / dataset["volume"].rolling(hold_period).mean()
 
 # 计算持仓时间长度内夏普比率（暂取无风险利率为0）
 dataset['Sharpe'] = dataset['return'].rolling(hold_period).mean(
-) / dataset['return'].rolling(hold_period).std()  # *np.sqrt(252)
+) / dataset['return'].rolling(hold_period).std()        # *np.sqrt(252)
 
 # 计算未来一个周期的收益
-dataset["future_return"] = dataset["close"].pct_change(future_period).shift(-future_period)
+dataset["future_return"] = dataset["close"].pct_change(future_period).shift(-future_period-1)
 
 
 hist_plot(dataset['hold_return'], str(hold_period) + '_days_hold_return')
@@ -183,9 +179,9 @@ hist_plot(dataset['Sharpe'], str(hold_period) + '_days_Sharpe_ratio')
 
 print(dataset.head())
 
-# Create features  /////这部分需要重新构造
-# cols_features = ['last_return', 'std_normalized', 'ma_ratio', 'price_deviation', 'volume_deviation']
+# Create features  
 cols_features = ['hold_return', '5_days_return', 'volume_ratio', 'Sharpe']  #
+# cols_features = ['last_return', 'std_normalized', 'ma_ratio', 'price_deviation', 'volume_deviation']
 # dataset['last_return'] = dataset[column_close].pct_change()
 # dataset['std_normalized'] = dataset[column_close].rolling(std_period).apply(std_normalized)
 # dataset['ma_ratio'] = dataset[column_close].rolling(ma_period).apply(ma_ratio)
@@ -204,14 +200,11 @@ for i in range(0, dataset.shape[0], 1):
     a.append(i)
 dataset = dataset.iloc[a]
 print("dataset:\n", dataset)
-# print()
 
-# Split the data on sets
-# train_ind = int(np.where(dataset.index == '2014-01-02')[0])
-train_ind = int(dataset.shape[0] * 1)
-print(train_ind)
+train_ind = int(dataset.shape[0] * 0.5)
+train_ind = 2000
 train_set = dataset[cols_features][:train_ind]
-# test_set = dataset[cols_features].values[train_ind:]
+test_set = dataset[cols_features].values[train_ind:]
 
 print("train_set：\n", train_set)
 
