@@ -6,17 +6,25 @@ import matplotlib as plt
 import numpy as np
 import os
 
+import pathlib
+
+# import warnings
+# warnings.filterwarnings("ignore")
+
 os.getcwd()
 
 #数据加载
-df=pd.read_csv('CSI300.csv')
+
+df_data_path = pathlib.Path.cwd() / ".." / "data" / "CSI300.csv"
+
+df=pd.read_csv(df_data_path)
 df.index=pd.to_datetime(df.date)
 df['openinterest']=0
 
 
 #随机生成一个-1，0，1的predictions序列
 sig=[]
-for i in range(len(stock_df)):
+for i in range(len(df)):
     x=np.random.randn()
     if x> 0.2:
         sig.append(1)
