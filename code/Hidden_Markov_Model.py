@@ -32,7 +32,7 @@ sns.set()
 warnings.filterwarnings("ignore")
 
 # Brute force modelling
-def get_best_hmm_model(X, max_states, max_iter=10000):
+def get_best_hmm_model(X, max_states, max_iter=10000000):
     """
     :param X: stock data
     :param max_states: the number of hidden states
@@ -42,15 +42,28 @@ def get_best_hmm_model(X, max_states, max_iter=10000):
     best_score = -(10 ** 10)
     best_state = 0
 
-    for state in range(1, max_states + 1):
+    aic_vect = np.empty([0,1])
+    bic_vect = np.empty([0,1])
+    caic_vect = np.empty([0,1])
+
+    for state in range(2, max_states + 1):
+        num_params = state**2 + 2 * state - 1
         hmm_model = GaussianHMM(n_components=state, random_state=100,
                                 covariance_type="full", n_iter=max_iter).fit(X)
         if hmm_model.score(X) > best_score:
             best_score = hmm_model.score(X)
             best_state = state
 
+        aic_vect = np.vstack((aic_vect, -2 * hmm_model.score(X) + 2 * num_params))
+        bic_vect = np.vstack((bic_vect, -2 * hmm_model.score(X) + num_params * np.log(X.shape[0])))
+        caic_vect = np.vstack((caic_vect, -2 * hmm_model.score(X) + num_params * (np.log(X.shape[0])+1)))
+        best_state = np.argmin(bic_vect) + 2
+
     best_model = GaussianHMM(n_components=best_state, random_state=100,
                              covariance_type="full", n_iter=max_iter).fit(X)
+    print("aic_vect:\n", aic_vect)
+    print("bic_vect:\n", bic_vect)
+    print("caic_vect:\n", bic_vect)
     return best_model
 
 # Normalized st. deviation
@@ -116,24 +129,24 @@ PLOT_SHOW = True
 
 # ### load data and plot
 df_data_path = pathlib.Path.cwd() / ".." / "data" / "CSI300.csv"
-start_date = datetime.datetime(2005, 4, 8)
+start_date = datetime.datetime(2015, 4, 8)
 end_date = datetime.datetime(2021, 12, 31)
 dataset = obtain_prices_df(df_data_path, start_date, end_date)
 
-if (0==1):
-    fig = plt.figure(figsize=(20, 10))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(dataset["close"])
-    plt.xticks(fontsize=20)
-    plt.yticks(fontsize=20)
-    ax.set_title('Close Price CSI300', fontsize=30)
-    
-    fig = plt.figure(figsize=(20, 10))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(dataset["volume"])
-    plt.xticks(fontsize=20)
-    plt.yticks(fontsize=20)
-    ax.set_title('Volume CSI300', fontsize=30)
+# if (0 == 1):
+#     fig = plt.figure(figsize=(20, 10))
+#     ax = fig.add_subplot(1, 1, 1)
+#     ax.plot(dataset["close"])
+#     plt.xticks(fontsize=20)
+#     plt.yticks(fontsize=20)
+#     ax.set_title('Close Price CSI300', fontsize=30)
+
+#     fig = plt.figure(figsize=(20, 10))
+#     ax = fig.add_subplot(1, 1, 1)
+#     ax.plot(dataset["volume"])
+#     plt.xticks(fontsize=20)
+#     plt.yticks(fontsize=20)
+#     ax.set_title('Volume CSI300', fontsize=30)
 
 
 # ### Let's generate the features and look at them
@@ -154,7 +167,8 @@ dataset['return'] = dataset["close"].pct_change()
 dataset['hold_return'] = dataset['return'].rolling(hold_period).mean()
 
 # 计算持仓前5日平均收益率
-dataset['5_days_return'] = dataset['return'].rolling(partial_period).mean().shift(hold_period - partial_period)
+dataset['5_days_return'] = dataset['return'].rolling(
+    partial_period).mean().shift(hold_period - partial_period)
 
 # # 计算持仓前5日和持仓期的平均成交量之比
 # dataset['volume_ratio'] = dataset[column_volume].rolling(
@@ -169,7 +183,7 @@ dataset['Sharpe'] = dataset['return'].rolling(hold_period).mean(
 ) / dataset['return'].rolling(hold_period).std()        # *np.sqrt(252)
 
 # 计算未来一个周期的收益
-dataset["future_return"] = dataset["close"].pct_change(future_period).shift(-future_period-1)
+dataset["future_return"] = dataset["close"].pct_change(future_period).shift(-future_period - 1)
 
 
 hist_plot(dataset['hold_return'], str(hold_period) + '_days_hold_return')
@@ -179,32 +193,28 @@ hist_plot(dataset['Sharpe'], str(hold_period) + '_days_Sharpe_ratio')
 
 print(dataset.head())
 
-# Create features  
+# Create features
 cols_features = ['hold_return', '5_days_return', 'volume_ratio', 'Sharpe']  #
-# cols_features = ['last_return', 'std_normalized', 'ma_ratio', 'price_deviation', 'volume_deviation']
-# dataset['last_return'] = dataset[column_close].pct_change()
-# dataset['std_normalized'] = dataset[column_close].rolling(std_period).apply(std_normalized)
-# dataset['ma_ratio'] = dataset[column_close].rolling(ma_period).apply(ma_ratio)
-# dataset['price_deviation'] = dataset[column_close].rolling(
-#     price_deviation_period).apply(values_deviation)
-# dataset['volume_deviation'] = dataset[column_volume].rolling(
-#     volume_deviation_period).apply(values_deviation)
+
 
 
 dataset = dataset.replace([np.inf, -np.inf], np.nan)
 dataset = dataset.dropna()
+dataset1 = dataset.copy()
 
 # 这部分取训练样本的时候应该间隔一个持仓周期取
+adjustment_period = 1
 a = []
-for i in range(0, dataset.shape[0], 1):
+for i in range(0, dataset.shape[0], adjustment_period):
     a.append(i)
 dataset = dataset.iloc[a]
 print("dataset:\n", dataset)
 
-train_ind = int(dataset.shape[0] * 0.5)
+train_ind = int(dataset.shape[0] * 1)
 train_ind = 2000
 train_set = dataset[cols_features][:train_ind]
 test_set = dataset[cols_features].values[train_ind:]
+back_test_set = dataset[cols_features]
 
 print("train_set：\n", train_set)
 
@@ -221,10 +231,9 @@ for i in range(0, len(cols_features)):
 
 # ### Modeling
 
-model = get_best_hmm_model(X=train_set, max_states=2, max_iter=1000000)
+model = get_best_hmm_model(X=train_set, max_states=5, max_iter=1000000)
 # print(model)
 print("Best model with {0} states ".format(str(model.n_components)))
-print('The number of Hidden States', model.n_components)
 print('Mean matrix:\n', model.means_)
 print('Covariance matrix:\n', model.covars_)
 print('Transition matrix:\n', model.transmat_)
@@ -240,16 +249,38 @@ hidden_states = model.predict(train_set)
 
 plot_in_sample_hidden_states(model, dataset[:train_ind].reset_index(), hidden_states, "close")
 
-# ### Feature distribution depending on market state
 
+# ### Feature distribution depending on market state
 
 # compare_hidden_states(hmm_model=model, cols_features=cols_features, conf_interval=0.95)
 
 
-# ### Save our model
+# Back_test
+output = list(model.predict(back_test_set))
+df = dataset1
+# print(df)
+cumulative_ret = [1]
+daily_ret = []
+for i in range(0, df.shape[0] - adjustment_period, adjustment_period):
+    open_price = df.iloc[i + 1, 0]
+    close_price = df.iloc[i + adjustment_period, 1]
+    if output[int(i / adjustment_period)] == 2:
+        daily_ret.append(close_price / open_price - 1)
+        cumulative_ret.append(cumulative_ret[-1] * close_price / open_price)
+    elif output[int(i / adjustment_period)] == 1:
+        daily_ret.append(0)
+        cumulative_ret.append(cumulative_ret[-1])
+    else:
+        daily_ret.append(open_price / close_price - 1)
+        cumulative_ret.append(cumulative_ret[-1] * close_price / open_price)
+
+annualized_ret = cumulative_ret[-1]**(252 / df.shape[0])
+print(annualized_ret)
+print(np.mean(daily_ret) / np.std(daily_ret) / (adjustment_period**0.5))
+benchmark = (df.iloc[-1, 1] / df.iloc[0, 1])**(252 / df.shape[0])
+print(benchmark)
 
 
-# joblib.dump(model, '../data/'+'quandl_' + asset.replace('/', '_') + '_final_model.pkl')
 
 if PLOT_SHOW:
     plt.show()
