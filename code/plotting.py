@@ -58,7 +58,7 @@ def plot_hidden_states(hmm_model, data, X, column_price):
         ax[1].set_title("future return distribution at {0}th hidden state".format(i))
         ax[1].grid(True)
 
-        ax[2].plot(data["future_return"][mask].cumsum(), c=colour)
+        ax[2].plot(1+data["future_return"][mask].cumsum(), c=colour)
         ax[2].set_title("cumulative future return at {0}th hidden state".format(i))
         ax[2].grid(True)
 
