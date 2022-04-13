@@ -8,16 +8,17 @@ from matplotlib.dates import YearLocator, MonthLocator
 from hmmlearn.hmm import GaussianHMM
 
 
-def plot_in_sample_hidden_states(hmm_model, df, hidden_states, column_price):
+def plot_in_sample_hidden_states(hmm_model, df, features, column_price):
     """
     Plot the adjusted closing prices masked by 
     the in-sample hidden states as a mechanism
     to understand the market regimes.
     """
-    # Predict the hidden states array
-    # hidden_states = hmm_model.predict(features)
+    # Predict the hidden states array    
+    hidden_states = hmm_model.predict(features)
+    
     # Create the correctly formatted plot
-    fig, axs = plt.subplots(figsize=(15, 15), sharex=True, sharey=True)
+    fig, axs = plt.subplots(figsize=(15, 15))
     colours = cm.rainbow(
         np.linspace(0, 1, hmm_model.n_components)
     )
@@ -28,21 +29,22 @@ def plot_in_sample_hidden_states(hmm_model, df, hidden_states, column_price):
             df.index[mask],
             df[column_price][mask],
             ".", linestyle='none',
-            c=colour
+            c=colour,
+            label='state' + str(i)
         )
-        # axs.set_title("Hidden State #%s" % i)
         axs.xaxis.set_major_locator(YearLocator())
         axs.xaxis.set_minor_locator(MonthLocator())
-        axs.grid(True)
-    # plt.show()
+        axs.tick_params(direction='in', grid_alpha=0.5)
+        axs.grid(linestyle='-.')  
+        axs.legend(loc='best')
 
 # General plots of hidden states
-def plot_hidden_states(hmm_model, data, X, column_price):
+def plot_hidden_states(hmm_model, data, features, column_price):
     # plt.figure(figsize=(15, 15))
     fig, axs = plt.subplots(hmm_model.n_components, 3, figsize=(15, 15))
     colours = cm.rainbow(
         np.linspace(0, 1, hmm_model.n_components))
-    hidden_states = hmm_model.predict(X)
+    hidden_states = hmm_model.predict(features)
 
     for i, (ax, colour) in enumerate(zip(axs, colours)):
         mask = hidden_states == i
@@ -58,7 +60,7 @@ def plot_hidden_states(hmm_model, data, X, column_price):
         ax[1].set_title("future return distribution at {0}th hidden state".format(i))
         ax[1].grid(True)
 
-        ax[2].plot(1+data["future_return"][mask].cumsum(), c=colour)
+        ax[2].plot(1 + data["future_return"][mask].cumsum(), c=colour)
         ax[2].set_title("cumulative future return at {0}th hidden state".format(i))
         ax[2].grid(True)
 

@@ -4,7 +4,6 @@
 # ### Libraries
 
 import warnings
-# import quandl
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -24,23 +23,39 @@ from plotting import plot_hidden_states
 from plotting import hist_plot
 
 sns.set()
+warnings.filterwarnings("ignore")
 
 
 # ### Basic functions for the analysis
 # Modelling, feature engineering, plotting.
 
-warnings.filterwarnings("ignore")
 
-def model_selection(X, max_states, max_iter=100000):
+def obtain_prices_df(csv_filepath, start_date, end_date):
     """
-    :param X: stock data
-    :param max_states: the number of hidden states
-    :param max_iter: numbers of model iterations
-    :return: the optimal HMM
+    Obtain the prices DataFrame from the CSV file,
+    filter by start date and end date.
+    """
+    df = pd.read_csv(
+        csv_filepath, header=0,
+        names=["date", "open", "close", "high", "low", "volume", "money"],
+        index_col="date", parse_dates=True)
+    df = df[start_date.strftime("%Y-%m-%d"):end_date.strftime("%Y-%m-%d")]
+    df.dropna(inplace=True)
+    return df
+
+def model_selection(X, max_states, max_iter=10000):
+    """
+    :param X: Feature matrix
+    :param max_states: the max number of hidden states
+    :param max_iter: the max numbers of model iterations
+    :return: aic bic caic best_state
     """
 
+    # to store Akaike information criterion (AIC)value
     aic_vect = np.empty([0, 1])
+    # to store Bayesian information criterion (BIC) value
     bic_vect = np.empty([0, 1])
+    # to store the Bozdogan Consistent Akaike Information Criterion (CAIC)
     caic_vect = np.empty([0, 1])
 
     for state in range(2, max_states + 1):
@@ -53,6 +68,7 @@ def model_selection(X, max_states, max_iter=100000):
                                num_params * (np.log(X.shape[0]) + 1)))
         best_state = np.argmin(bic_vect) + 2
     return aic_vect, bic_vect, caic_vect, best_state
+
 # Brute force modelling
 def get_best_hmm_model(X, best_state, max_iter=100000):
     """
@@ -77,19 +93,6 @@ def ma_ratio(vals):
 def values_deviation(vals):
     return (vals[-1] - np.mean(vals)) / np.std(vals)
 
-
-def obtain_prices_df(csv_filepath, start_date, end_date):
-    """
-    Obtain the prices DataFrame from the CSV file,
-    filter by start date and end date.
-    """
-    df = pd.read_csv(
-        csv_filepath, header=0,
-        names=["date", "open", "close", "high", "low", "volume", "money"],
-        index_col="date", parse_dates=True)
-    df = df[start_date.strftime("%Y-%m-%d"):end_date.strftime("%Y-%m-%d")]
-    df.dropna(inplace=True)
-    return df
 
 def mean_confidence_interval(vals, confidence):
     a = 1.0 * np.array(vals)
@@ -123,8 +126,8 @@ def compare_hidden_states(hmm_model, cols_features, conf_interval, iters=1000):
 
 pd.options.display.max_rows = 30
 pd.options.display.max_columns = 30
-PLOT_SHOW = True
-PLOT_SHOW = False
+PLOT_SHOW = True    # 显示绘图结果
+PLOT_SHOW = False   # 不显示绘图结果
 
 # ### load data and plot
 df_data_path = pathlib.Path.cwd() / ".." / "data" / "CSI300.csv"
@@ -132,7 +135,7 @@ start_date = datetime.datetime(2005, 4, 8)
 end_date = datetime.datetime(2021, 12, 31)
 dataset = obtain_prices_df(df_data_path, start_date, end_date)
 
-if (0 == 0):
+if (0 == 1):
     fig = plt.figure(figsize=(20, 10))
     ax = fig.add_subplot(1, 1, 1)
     ax.plot(dataset["close"])
@@ -150,8 +153,8 @@ if (0 == 0):
 
 # Feature params
 future_period = 1
-long_period = 7  # 持仓周期
-short_period = 3
+long_period = 7     # long period
+short_period = 3    # short period
 
 # 计算日收益率
 dataset['return'] = dataset["close"].pct_change()
@@ -159,56 +162,62 @@ dataset['return'] = dataset["close"].pct_change()
 # 计算长周期平均收益率
 dataset['long_period_return'] = dataset['return'].rolling(long_period).mean()
 
-
 # 计算短周期平均收益率
 # dataset['short_period_return'] = dataset['return'].rolling(
 #     short_period).mean().shift(long_period - short_period)
 
-dataset['short_period_return'] = dataset['return'].rolling(
-    short_period).mean()
+dataset['short_period_return'] = dataset['return'].rolling(short_period).mean()
 
 # # 计算持仓前5日和持仓期的平均成交量之比
 # dataset['volume_ratio'] = dataset[column_volume].rolling(
 #     5).mean().shift(long_period-5) / dataset[column_volume].rolling(long_period).mean()
 
-# 计算持仓后5日和持仓期的平均成交量之比，结果应该跟上一个没明显差别
+# 计算短期持仓和长期平均成交量之比
 dataset['volume_ratio'] = dataset["volume"].rolling(
     short_period).mean() / dataset["volume"].rolling(long_period).mean()
 
-# 计算持仓时间长度内夏普比率（暂取无风险利率为0）
+# 计算长周期内夏普比率（暂取无风险利率为0）
 dataset['Sharpe'] = dataset['return'].rolling(long_period).mean(
 ) / dataset['return'].rolling(long_period).std()        # *np.sqrt(252)
 
 # 计算未来一个周期的收益
 dataset["future_return"] = dataset["close"].pct_change(future_period).shift(-future_period)
 
-### hist plot
-hist_plot(dataset['long_period_return'], str(long_period) + '_days_hold_return')
-hist_plot(dataset['short_period_return'], 'short_period_return')
-hist_plot(dataset['volume_ratio'], 'volume_ratio_5_' + str(long_period))
+# hist plot
+hist_plot(dataset['long_period_return'], str(long_period) + '_days_return')
+hist_plot(dataset['short_period_return'], str(short_period) + '_days_return')
+hist_plot(dataset['volume_ratio'], 'volume_ratio_of' + str(short_period) + str(long_period))
 hist_plot(dataset['Sharpe'], str(long_period) + '_days_Sharpe_ratio')
 
 # Create features
 cols_features = ['long_period_return', 'short_period_return', 'volume_ratio', 'Sharpe']  #
 dataset = dataset.replace([np.inf, -np.inf], np.nan)
 dataset = dataset.dropna()
-dataset1 = dataset.copy()       ### for back test
+dataset1 = dataset.copy()  # for back test
 
-# 这部分取训练样本的时候应该间隔一个持仓周期取
+# 选取训练样本，从第2000开始往前每间隔一个adjustment_period取样
 adjustment_period = 1
-a = []
-for i in range(0, dataset.shape[0], adjustment_period):
-    a.append(i)
-dataset = dataset.iloc[a]
-print("dataset:\n", dataset)
+train_end_ind = 2000
+train_index = []
+for i in range(train_end_ind, 0, -adjustment_period):
+    train_index.append(i)
+train_set = dataset.iloc[train_index]
+train_set = train_set.sort_index()
+train_features = train_set[cols_features]
 
-train_ind = int(dataset.shape[0] * 1.0)
-train_ind = 2000
-train_set = dataset[cols_features][:train_ind]
-test_set = dataset[cols_features][train_ind:]
+print("train_set:\n", train_set)
+
+test_index = []
+for i in range(train_end_ind + adjustment_period, dataset.shape[0], adjustment_period):
+    test_index.append(i)
+test_set = dataset.iloc[train_index][cols_features]
+test_set = test_set.sort_index()
+test_features = test_set[cols_features]
+
+print("test_set：\n", test_set)
+
+
 back_test_set = dataset[cols_features]
-
-print("train_set：\n", train_set)
 
 
 # ### Plot features
@@ -219,7 +228,7 @@ print("train_set：\n", train_set)
 #     axs[i].set_title(cols_features[i], fontsize=20)
 #     axs[i].grid(True)
 
-##----------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------
 # ### get the best states number
 # aic_matrix = np.empty([7, 0])
 # bic_matrix = np.empty([7, 0])
@@ -247,23 +256,27 @@ print("train_set：\n", train_set)
 # print("best_states_vector", best_states_vector)
 
 # ### Modeling
-model = get_best_hmm_model(train_set, best_state=6, max_iter=10000)
+model = get_best_hmm_model(train_features, best_state=5, max_iter=10000)
 # print(model)
 print("Best model with {0} states ".format(str(model.n_components)))
 print('Mean matrix:\n', model.means_)
 print('Covariance matrix:\n', model.covars_)
 print('Transition matrix:\n', model.transmat_)
 
+# # for i in range(2000, dataset.shape[0]):
+# for i in range(2000, 2050):
+#     train_set = dataset[:i][cols_features]
+#     # model = get_best_hmm_model(train_set, best_state=6, max_iter=10000)
+#     hidden_states = model.predict(train_set)
+#     print(i, hidden_states[-10:-1])
+#     # train_set[] = hidden_states[-1]
 
 # ### Lets look at state and the next market movement
 
 
-plot_hidden_states(model, dataset[:train_ind], train_set, "close")
+plot_hidden_states(model, train_set, train_features, "close")
 
-
-hidden_states = model.predict(train_set)
-
-plot_in_sample_hidden_states(model, dataset[:train_ind], hidden_states, "close")
+plot_in_sample_hidden_states(model, train_set, train_features, "close")
 
 
 # ### Feature distribution depending on market state
@@ -302,3 +315,10 @@ print(benchmark)
 
 if PLOT_SHOW:
     plt.show()
+
+
+"""
+存在的问题：
+1、如果状态数量是5，如何设置相应的策略
+2、滚动数据训练的模型状态不对应，比如用第1-2000条训练出来的状态1和2-2001条数据训练出来的状态1表示的意义不一致
+"""
