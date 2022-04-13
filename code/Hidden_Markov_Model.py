@@ -197,7 +197,7 @@ dataset1 = dataset.copy()  # for back test
 
 # 选取训练样本，从第2000开始往前每间隔一个adjustment_period取样
 adjustment_period = 1
-train_end_ind = 2000
+train_end_ind = 2020
 train_index = []
 for i in range(train_end_ind, 0, -adjustment_period):
     train_index.append(i)
@@ -256,8 +256,9 @@ back_test_set = dataset[cols_features]
 # print("best_states_vector", best_states_vector)
 
 # ### Modeling
-model = get_best_hmm_model(train_features, best_state=5, max_iter=10000)
-# print(model)
+model = get_best_hmm_model(train_features, best_state=3, max_iter=10000)
+hidden_states = model.predict(test_features)
+print(hidden_states)
 print("Best model with {0} states ".format(str(model.n_components)))
 print('Mean matrix:\n', model.means_)
 print('Covariance matrix:\n', model.covars_)
