@@ -125,7 +125,7 @@ pd.options.display.max_columns = 30
 PLOT_SHOW = True
 # PLOT_SHOW = False
 # ### load data and plot
-df_data_path = pathlib.Path.cwd() / "CSI300.csv"
+df_data_path = pathlib.Path.cwd() / "../data/CSI300.csv"
 # start_date_string = '2014-04-01'
 asset = 'CSI 300 Index'
 column_close = 'close'

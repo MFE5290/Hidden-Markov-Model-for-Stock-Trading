@@ -81,6 +81,20 @@ def get_best_hmm_model(X, best_state, max_iter=100000):
                              covariance_type="full", n_iter=max_iter).fit(X)
     return best_model
 
+def get_expected_return(hmm_model, train_set, train_features):
+    hidden_states = model.predict(train_features)
+    ave_return = np.zeros(model.n_components)
+    for i in range(0, model.n_components):
+        mask = hidden_states == i
+        ave_return[i] = train_set['return'][mask].mean()
+    # print("ave_return:", ave_return)
+    print("current state:", hidden_states[-1])
+    prob = model.transmat_[hidden_states[-1]]
+    # print(prob)
+    expected_return = sum(prob*ave_return)
+    print("expected_return:", expected_return)
+    return hidden_states, expected_return
+
 # Normalized st. deviation
 def std_normalized(vals):
     return np.std(vals) / np.mean(vals)
@@ -127,7 +141,7 @@ def compare_hidden_states(hmm_model, cols_features, conf_interval, iters=1000):
 pd.options.display.max_rows = 30
 pd.options.display.max_columns = 30
 PLOT_SHOW = True    # 显示绘图结果
-PLOT_SHOW = False   # 不显示绘图结果
+# PLOT_SHOW = False   # 不显示绘图结果
 
 # ### load data and plot
 df_data_path = pathlib.Path.cwd() / ".." / "data" / "CSI300.csv"
@@ -153,8 +167,8 @@ if (0 == 1):
 
 # Feature params
 future_period = 1
-long_period = 7     # long period
-short_period = 3    # short period
+long_period = 10     # long period
+short_period = 5    # short period
 
 # 计算日收益率
 dataset['return'] = dataset["close"].pct_change()
@@ -197,7 +211,7 @@ dataset1 = dataset.copy()  # for back test
 
 # 选取训练样本，从第2000开始往前每间隔一个adjustment_period取样
 adjustment_period = 1
-train_end_ind = 2020
+train_end_ind = 2000
 train_index = []
 for i in range(train_end_ind, 0, -adjustment_period):
     train_index.append(i)
@@ -210,7 +224,7 @@ print("train_set:\n", train_set)
 test_index = []
 for i in range(train_end_ind + adjustment_period, dataset.shape[0], adjustment_period):
     test_index.append(i)
-test_set = dataset.iloc[train_index][cols_features]
+test_set = dataset.iloc[test_index]
 test_set = test_set.sort_index()
 test_features = test_set[cols_features]
 
@@ -235,7 +249,7 @@ back_test_set = dataset[cols_features]
 # best_states_vector = np.empty([0])
 # for i in range(0, 10):
 #     print(i)
-#     train_set_i = dataset[cols_features][i * 100:2000 + i * 100]
+#     train_set_i = dataset[cols_features][i * 100:1000 + i * 100]
 #     aic_vect, bic_vect, caic_vect,best_state = model_selection(X=train_set_i, max_states=8, max_iter=10000)
 #     aic_matrix = np.hstack((aic_matrix, aic_vect))
 #     bic_matrix = np.hstack((bic_matrix, bic_vect))
@@ -255,24 +269,43 @@ back_test_set = dataset[cols_features]
 
 # print("best_states_vector", best_states_vector)
 
-# ### Modeling
-model = get_best_hmm_model(train_features, best_state=3, max_iter=10000)
-hidden_states = model.predict(test_features)
-print(hidden_states)
+# ----------------------------------------------------------------------------------------------------------
+model = get_best_hmm_model(train_features, best_state=4, max_iter=10000)
+
 print("Best model with {0} states ".format(str(model.n_components)))
 print('Mean matrix:\n', model.means_)
 print('Covariance matrix:\n', model.covars_)
 print('Transition matrix:\n', model.transmat_)
+# ### Modeling
+# for i in range(2000, dataset.shape[0]):
+signal = []
+for i in range(2000, dataset.shape[0]-1):
+    print(i)
+    adjustment_period = 1
+    train_end_ind = i
+    train_index = []
+    for j in range(train_end_ind, 0, -adjustment_period):
+        train_index.append(j)
 
-# # for i in range(2000, dataset.shape[0]):
-# for i in range(2000, 2050):
-#     train_set = dataset[:i][cols_features]
-#     # model = get_best_hmm_model(train_set, best_state=6, max_iter=10000)
-#     hidden_states = model.predict(train_set)
-#     print(i, hidden_states[-10:-1])
-#     # train_set[] = hidden_states[-1]
+    train_set = dataset.iloc[train_index]
+    train_set = train_set.sort_index()
+    train_features = train_set[cols_features]
 
-# ### Lets look at state and the next market movement
+    # model = get_best_hmm_model(train_features, best_state=5, max_iter=10000)
+    hidden_states, expected_return = get_expected_return(model, train_set, train_features)
+    # if (hidden_states[-1]== 0 or hidden_states[-1] == 2):
+    #     signal.append(1)
+    # else:
+    #     signal.append(-1)
+    if (expected_return > 0.000):           #预期收益大于0.2%，持仓状态
+        signal.append(1)
+    # elif(expected_return > 0.0):        
+    #     signal.append(0)
+    else:
+        signal.append(-1)                    
+
+test_set["signal"] = signal
+test_set.to_csv('test_set.csv')
 
 
 plot_hidden_states(model, train_set, train_features, "close")
@@ -318,8 +351,3 @@ if PLOT_SHOW:
     plt.show()
 
 
-"""
-存在的问题：
-1、如果状态数量是5，如何设置相应的策略
-2、滚动数据训练的模型状态不对应，比如用第1-2000条训练出来的状态1和2-2001条数据训练出来的状态1表示的意义不一致
-"""
