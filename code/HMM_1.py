@@ -125,7 +125,7 @@ pd.options.display.max_columns = 30
 PLOT_SHOW = True
 # PLOT_SHOW = False
 # ### load data and plot
-df_data_path = pathlib.Path.cwd() / "../data/CSI300.csv"
+df_data_path = '/Users/wyb/PycharmProjects/pythonProject/HMM_project/CSI300.csv'
 # start_date_string = '2014-04-01'
 asset = 'CSI 300 Index'
 column_close = 'close'
@@ -170,10 +170,11 @@ cols_features = ['hold_return', '5_days_return', 'volume_ratio', 'Sharpe']
 dataset = dataset.replace([np.inf, -np.inf], np.nan)
 dataset = dataset.dropna()
 df = dataset.copy()
-train_ind = int(np.where(dataset.index == '2014-01-02')[0])
+train_ind = int(np.where(dataset.index == '2019-01-02')[0])
 train_set = pd.DataFrame(dataset[cols_features].values[:train_ind])
 test_set = dataset[cols_features].values[train_ind:]
 df = df.iloc[train_ind:, :]
+
 
 # 设置调仓周期
 adjustment_period = 2
@@ -211,20 +212,18 @@ for i in range(len(output)):
     else:
         if output[i] == 0:
             signal.append(0)
-            print(0)
         elif output[i] == 1:
             signal.append(-1)
         else:
             signal.append(1)
-            print(2)
 for i in range(2, len(signal), 2):
     if signal[i-2] == 1 and signal[i] == 1:
         signal[i] == 0
 
-df['signal'] = signal
-df = df.shift(1)
-# print(df)
+df['o_signal'] = signal
+df['signal'] = df['o_signal'].shift(1)
 df = df.dropna()
+# print(df)
 df.to_csv('backtest.csv')
 
 
