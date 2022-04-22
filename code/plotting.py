@@ -57,11 +57,11 @@ def plot_hidden_states(hmm_model, data, features, column_price):
 
         ax[1].hist(data["future_return"][mask], bins=30)
         ax[1].set_xlim([-0.1, 0.1])
-        ax[1].set_title("future return distribution at {0}th hidden state".format(i))
+        ax[1].set_title("Return distribution at {0}th hidden state".format(i))
         ax[1].grid(True)
 
-        ax[2].plot(1 + data["future_return"][mask].cumsum(), c=colour)
-        ax[2].set_title("cumulative future return at {0}th hidden state".format(i))
+        ax[2].plot(data["future_return"][mask].cumsum(), c=colour)
+        ax[2].set_title("Cumulative return at {0}th hidden state".format(i))
         ax[2].grid(True)
 
     plt.tight_layout()
@@ -74,3 +74,5 @@ def hist_plot(data, title):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     ax.set_title(title, fontsize=30)
+
+    

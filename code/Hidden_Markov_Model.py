@@ -91,7 +91,7 @@ def get_expected_return(hmm_model, train_set, train_features):
     print("current state:", hidden_states[-1])
     prob = model.transmat_[hidden_states[-1]]
     # print(prob)
-    expected_return = sum(prob*ave_return)
+    expected_return = sum(prob * ave_return)
     print("expected_return:", expected_return)
     return hidden_states, expected_return
 
@@ -269,8 +269,16 @@ back_test_set = dataset[cols_features]
 
 # print("best_states_vector", best_states_vector)
 
+
 # ----------------------------------------------------------------------------------------------------------
 model = get_best_hmm_model(train_features, best_state=4, max_iter=10000)
+
+plot_hidden_states(model, train_set, train_features, "close")
+# plt.savefig("../figure/hidden_states1.png", dpi=400, bbox_inches='tight')
+
+
+plot_in_sample_hidden_states(model, train_set, train_features, "close")
+# plt.savefig("../figure/hidden_states2.png", dpi=400, bbox_inches='tight')
 
 print("Best model with {0} states ".format(str(model.n_components)))
 print('Mean matrix:\n', model.means_)
@@ -279,12 +287,12 @@ print('Transition matrix:\n', model.transmat_)
 # ### Modeling
 # for i in range(2000, dataset.shape[0]):
 signal = []
-for i in range(2000, dataset.shape[0]-1):
+for i in range(2000, dataset.shape[0] - 1):
     print(i)
     adjustment_period = 1
     train_end_ind = i
     train_index = []
-    for j in range(train_end_ind, 0, -adjustment_period):
+    for j in range(train_end_ind, -1, -adjustment_period):
         train_index.append(j)
 
     train_set = dataset.iloc[train_index]
@@ -293,24 +301,22 @@ for i in range(2000, dataset.shape[0]-1):
 
     # model = get_best_hmm_model(train_features, best_state=5, max_iter=10000)
     hidden_states, expected_return = get_expected_return(model, train_set, train_features)
-    # if (hidden_states[-1]== 0 or hidden_states[-1] == 2):
+
+    if (expected_return > 0.002):
+        signal.append(1)
+    elif(expected_return < 0.0):        
+        signal.append(-1)
+    else:
+        signal.append(0)
+
+    # if (hidden_states[-1] == 0 or hidden_states[-1] == 2):
     #     signal.append(1)
     # else:
     #     signal.append(-1)
-    if (expected_return > 0.000):           #预期收益大于0.2%，持仓状态
-        signal.append(1)
-    # elif(expected_return > 0.0):        
-    #     signal.append(0)
-    else:
-        signal.append(-1)                    
+
 
 test_set["signal"] = signal
 test_set.to_csv('test_set.csv')
-
-
-plot_hidden_states(model, train_set, train_features, "close")
-
-plot_in_sample_hidden_states(model, train_set, train_features, "close")
 
 
 # ### Feature distribution depending on market state
@@ -349,5 +355,3 @@ print(benchmark)
 
 if PLOT_SHOW:
     plt.show()
-
-
