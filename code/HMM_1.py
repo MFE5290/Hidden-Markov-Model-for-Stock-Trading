@@ -125,7 +125,7 @@ pd.options.display.max_columns = 30
 PLOT_SHOW = True
 # PLOT_SHOW = False
 # ### load data and plot
-df_data_path = '/Users/wyb/PycharmProjects/pythonProject/HMM_project/CSI300.csv'
+df_data_path = pathlib.Path.cwd() / ".." / "data" / "CSI300.csv"
 # start_date_string = '2014-04-01'
 asset = 'CSI 300 Index'
 column_close = 'close'
@@ -139,13 +139,14 @@ dataset = pd.read_csv(df_data_path, index_col=0, parse_dates=True)
 # ### Let's generate the features and look at them
 
 # Feature params
-future_period = 1
+future_period = 2
 std_period = 10
 ma_period = 10
 price_deviation_period = 10
 volume_deviation_period = 10
 
-hold_period = 10  # 持仓周期
+hold_period = 7  # 持仓周期
+short_period = 3
 # 计算日收益率
 dataset['return'] = dataset[column_close].pct_change()
 
@@ -153,10 +154,10 @@ dataset['return'] = dataset[column_close].pct_change()
 dataset['hold_return'] = dataset['return'].rolling(hold_period).mean()
 
 # 计算5日平均收益率
-dataset['5_days_return'] = dataset['return'].rolling(5).mean()
+dataset['5_days_return'] = dataset['return'].rolling(short_period).mean()
 
 # 计算5日和持仓期的平均成交量之比
-dataset['volume_ratio'] = dataset[column_volume].rolling(5).mean() / \
+dataset['volume_ratio'] = dataset[column_volume].rolling(short_period).mean() / \
                           dataset[column_volume].rolling(hold_period).mean()
 
 # 计算持仓时间长度内夏普比率（暂取无风险利率为0）
@@ -164,13 +165,14 @@ dataset['Sharpe'] = dataset['return'].rolling(hold_period).mean() / \
                     dataset['return'].rolling(hold_period).std()  # *np.sqrt(252)
 
 cols_features = ['hold_return', '5_days_return', 'volume_ratio', 'Sharpe']
-# dataset["future_return"] = dataset[column_close].pct_change(future_period).shift(-future_period)
+dataset["future_return"] = dataset[column_close].pct_change(future_period).shift(-future_period)
+
 
 # 划分训练数据、测试数据
 dataset = dataset.replace([np.inf, -np.inf], np.nan)
 dataset = dataset.dropna()
 df = dataset.copy()
-train_ind = int(np.where(dataset.index == '2019-01-02')[0])
+train_ind = int(np.where(dataset.index == '2014-01-02')[0])
 train_set = pd.DataFrame(dataset[cols_features].values[:train_ind])
 test_set = dataset[cols_features].values[train_ind:]
 df = df.iloc[train_ind:, :]
@@ -198,9 +200,8 @@ print(model.transmat_)
 
 ### Lets look at state and the next market movement
 
-
-# plot_hidden_states(model, dataset[:train_ind].reset_index(), train_set, column_close)
-# plt.show()
+# train_dataset = dataset.iloc[a]
+# train_dataset['signal'] = model.predict(train_set)
 
 ### Back_test
 
@@ -211,9 +212,9 @@ for i in range(len(output)):
         signal.append(0)
     else:
         if output[i] == 0:
-            signal.append(0)
-        elif output[i] == 1:
             signal.append(-1)
+        elif output[i] == 1:
+            signal.append(1)
         else:
             signal.append(1)
 for i in range(2, len(signal), 2):
