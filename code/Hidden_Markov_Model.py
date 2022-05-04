@@ -69,8 +69,7 @@ def model_selection(X, max_states, max_iter=10000):
         best_state = np.argmin(bic_vect) + 2
     return aic_vect, bic_vect, caic_vect, best_state
 
-# Brute force modelling
-def get_best_hmm_model(X, best_state, max_iter=100000):
+def get_best_hmm_model(X, best_state, max_iter=10000):
     """
     :param X: stock data
     :param max_states: the number of hidden states
@@ -143,32 +142,31 @@ pd.options.display.max_columns = 30
 PLOT_SHOW = True    # 显示绘图结果
 # PLOT_SHOW = False   # 不显示绘图结果
 
-# ### load data and plot
-df_data_path = pathlib.Path.cwd() / ".." / "data" / "CSI300.csv"
-start_date = datetime.datetime(2005, 4, 8)
+# load data and plot
+df_data_path = pathlib.Path.cwd() / ".." / "data" 
+start_date = datetime.datetime(2010, 1, 1)
 end_date = datetime.datetime(2021, 12, 31)
-dataset = obtain_prices_df(df_data_path, start_date, end_date)
+dataset = obtain_prices_df(df_data_path / "CSI300.csv", start_date, end_date)
 
-if (0 == 1):
-    fig = plt.figure(figsize=(20, 10))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(dataset["close"])
-    plt.xticks(fontsize=20)
-    plt.yticks(fontsize=20)
-    ax.set_title('Close Price CSI300', fontsize=30)
+fig = plt.figure(figsize=(20, 10))
+ax = fig.add_subplot(1, 1, 1)
+ax.plot(dataset["close"])
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+ax.set_title('Close Price CSI300', fontsize=30)
 
-    fig = plt.figure(figsize=(20, 10))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(dataset["volume"])
-    plt.xticks(fontsize=20)
-    plt.yticks(fontsize=20)
-    ax.set_title('Volume CSI300', fontsize=30)
+fig = plt.figure(figsize=(20, 10))
+ax = fig.add_subplot(1, 1, 1)
+ax.plot(dataset["volume"])
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+ax.set_title('Volume CSI300', fontsize=30)
 
 
 # Feature params
 future_period = 1
-long_period = 10     # long period
-short_period = 5    # short period
+long_period = 7     # long period
+short_period = 3    # short period
 
 # 计算日收益率
 dataset['return'] = dataset["close"].pct_change()
@@ -177,22 +175,21 @@ dataset['return'] = dataset["close"].pct_change()
 dataset['long_period_return'] = dataset['return'].rolling(long_period).mean()
 
 # 计算短周期平均收益率
-# dataset['short_period_return'] = dataset['return'].rolling(
-#     short_period).mean().shift(long_period - short_period)
-
 dataset['short_period_return'] = dataset['return'].rolling(short_period).mean()
 
-# # 计算持仓前5日和持仓期的平均成交量之比
-# dataset['volume_ratio'] = dataset[column_volume].rolling(
-#     5).mean().shift(long_period-5) / dataset[column_volume].rolling(long_period).mean()
-
-# 计算短期持仓和长期平均成交量之比
+# 计算短期平均成交量和长期平均成交量之比
 dataset['volume_ratio'] = dataset["volume"].rolling(
     short_period).mean() / dataset["volume"].rolling(long_period).mean()
 
-# 计算长周期内夏普比率（暂取无风险利率为0）
+# 计算长周期内夏普比率，取无风险利率为0
 dataset['Sharpe'] = dataset['return'].rolling(long_period).mean(
 ) / dataset['return'].rolling(long_period).std()        # *np.sqrt(252)
+
+# 计算指数加权平均回报
+# spanNum = 15
+# dataset['ewma'] = dataset['return'].ewm(span=spanNum, min_periods=1).mean()
+# dataset['ewma_2'] = dataset['return'].ewm(span=spanNum, min_periods=1).std()
+
 
 # 计算未来一个周期的收益
 dataset["future_return"] = dataset["close"].pct_change(future_period).shift(-future_period)
@@ -205,13 +202,14 @@ hist_plot(dataset['Sharpe'], str(long_period) + '_days_Sharpe_ratio')
 
 # Create features
 cols_features = ['long_period_return', 'short_period_return', 'volume_ratio', 'Sharpe']  #
+# cols_features = ['ewma','ewma_2']  #
 dataset = dataset.replace([np.inf, -np.inf], np.nan)
 dataset = dataset.dropna()
 dataset1 = dataset.copy()  # for back test
 
 # 选取训练样本，从第2000开始往前每间隔一个adjustment_period取样
 adjustment_period = 1
-train_end_ind = 2000
+train_end_ind = 1000
 train_index = []
 for i in range(train_end_ind, 0, -adjustment_period):
     train_index.append(i)
@@ -242,7 +240,7 @@ back_test_set = dataset[cols_features]
 #     axs[i].set_title(cols_features[i], fontsize=20)
 #     axs[i].grid(True)
 
-# ----------------------------------------------------------------------------------------------------------
+# # ----------------------------------------------------------------------------------------------------------
 # ### get the best states number
 # aic_matrix = np.empty([7, 0])
 # bic_matrix = np.empty([7, 0])
@@ -287,7 +285,7 @@ print('Transition matrix:\n', model.transmat_)
 # ### Modeling
 # for i in range(2000, dataset.shape[0]):
 signal = []
-for i in range(2000, dataset.shape[0] - 1):
+for i in range(1000, dataset.shape[0] - adjustment_period, adjustment_period):
     print(i)
     adjustment_period = 1
     train_end_ind = i
@@ -299,58 +297,24 @@ for i in range(2000, dataset.shape[0] - 1):
     train_set = train_set.sort_index()
     train_features = train_set[cols_features]
 
-    # model = get_best_hmm_model(train_features, best_state=5, max_iter=10000)
+    model = get_best_hmm_model(train_features, best_state=4, max_iter=10000)
     hidden_states, expected_return = get_expected_return(model, train_set, train_features)
 
-    if (expected_return > 0.002):
+    if (expected_return > 0.000):       ## 期望收益大于0.002买入
         signal.append(1)
-    elif(expected_return < 0.0):        
+    elif(expected_return < 0.000):      ## 期望收益小于0.000卖出
         signal.append(-1)
     else:
-        signal.append(0)
+        signal.append(0)                ## 期望收益在0.000-0.002之间，保持当前持仓状态
 
-    # if (hidden_states[-1] == 0 or hidden_states[-1] == 2):
-    #     signal.append(1)
-    # else:
-    #     signal.append(-1)
+   
 
 
 test_set["signal"] = signal
 test_set.to_csv('test_set.csv')
 
 
-# ### Feature distribution depending on market state
 
-# compare_hidden_states(hmm_model=model, cols_features=cols_features, conf_interval=0.95)
-
-
-# Back_test
-output = list(model.predict(back_test_set))
-df = dataset1
-# print(df)
-cumulative_ret = [1]
-daily_ret = []
-for i in range(0, df.shape[0] - adjustment_period, adjustment_period):
-    open_price = df.iloc[i + 1, 0]
-    close_price = df.iloc[i + adjustment_period, 1]
-    if output[int(i / adjustment_period)] == 2:
-        daily_ret.append(close_price / open_price - 1)
-        cumulative_ret.append(cumulative_ret[-1] * close_price / open_price)
-    elif output[int(i / adjustment_period)] == 1:
-        daily_ret.append(0)
-        cumulative_ret.append(cumulative_ret[-1])
-    else:
-        daily_ret.append(open_price / close_price - 1)
-        cumulative_ret.append(cumulative_ret[-1] * close_price / open_price)
-
-annualized_ret = cumulative_ret[-1]**(252 / df.shape[0])
-print(annualized_ret)
-print(np.mean(daily_ret) / np.std(daily_ret) / (adjustment_period**0.5))
-benchmark = (df.iloc[-1, 1] / df.iloc[0, 1])**(252 / df.shape[0])
-print(benchmark)
-
-# fig, axs = plt.subplots(1, 1, figsize=(15, 15))
-# axs.plot(cumulative_ret)
 
 
 if PLOT_SHOW:

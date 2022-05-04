@@ -14,9 +14,9 @@ def plot_in_sample_hidden_states(hmm_model, df, features, column_price):
     the in-sample hidden states as a mechanism
     to understand the market regimes.
     """
-    # Predict the hidden states array    
+    # Predict the hidden states array
     hidden_states = hmm_model.predict(features)
-    
+
     # Create the correctly formatted plot
     fig, axs = plt.subplots(figsize=(15, 15))
     colours = cm.rainbow(
@@ -35,7 +35,7 @@ def plot_in_sample_hidden_states(hmm_model, df, features, column_price):
         axs.xaxis.set_major_locator(YearLocator())
         axs.xaxis.set_minor_locator(MonthLocator())
         axs.tick_params(direction='in', grid_alpha=0.5)
-        axs.grid(linestyle='-.')  
+        axs.grid(linestyle='-.')
         axs.legend(loc='best')
 
 # General plots of hidden states
@@ -74,5 +74,3 @@ def hist_plot(data, title):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     ax.set_title(title, fontsize=30)
-
-    
