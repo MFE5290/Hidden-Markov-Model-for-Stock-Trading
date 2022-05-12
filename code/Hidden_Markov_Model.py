@@ -39,6 +39,7 @@ def obtain_prices_df(csv_filepath, start_date, end_date):
     df.dropna(inplace=True)
     return df
 
+
 def model_selection(X, max_states, max_iter=10000):
     """
     :param X: Feature matrix
@@ -83,11 +84,11 @@ def get_expected_return(hmm_model, train_set, train_features):
         mask = hidden_states == i
         ave_return[i] = train_set['return'][mask].mean()
     # print("ave_return:", ave_return)
+    #获取转移概率
     prob = model.transmat_[hidden_states[-1]]
     # print(prob)
+    #获取期望收益
     expected_return = sum(prob * ave_return)
-    print("current state: {}".format(hidden_states[-1]) +
-          ", expected_return:{:.4f}".format(expected_return))
     return hidden_states, expected_return
 
 
@@ -113,7 +114,7 @@ def compare_hidden_states(hmm_model, cols_features, conf_interval, iters=1000):
 
     plt.tight_layout()
 
-def compute_features(dataset):
+def compute_features(dataset, long_period, short_period):
     # 计算日收益率
     dataset['return'] = dataset["close"].pct_change()
 
@@ -132,7 +133,7 @@ def compute_features(dataset):
     ) / dataset['return'].rolling(long_period).std()        # *np.sqrt(252)
 
     # 计算指数加权平均回报
-    # spanNum = 15
+    # spanNum = 5
     # dataset['ewma'] = dataset['return'].ewm(span=spanNum, min_periods=1).mean()
     # dataset['ewma_2'] = dataset['return'].ewm(span=spanNum, min_periods=1).std()
 
@@ -157,34 +158,39 @@ future_period = 1
 long_period = 7     # long period
 short_period = 3    # short period
 
-indexList = ['CSI905', 'CSI300', 'CSI012', 'HSI']
+indexList = ['CSI300', 'CSI905', 'CSI012', 'CSI032', 'CSI033',
+             'CSI034', 'CSI036', 'CSI037', 'CSI038', 'CSI039']
+
+# indexList = ['CSI300', 'CSI905', 'CSI012']            
+
 
 for index in indexList:
     # 读取指数从2010年—2021年的历史数据
     dataset = obtain_prices_df(df_data_path / (index + '.csv'), start_date, end_date)
-    dataset = compute_features(dataset)
-
-    # # hist plot
-    # hist_plot(dataset['long_period_return'], str(long_period) + '_days_return')
-    # hist_plot(dataset['short_period_return'], str(short_period) + '_days_return')
-    # hist_plot(dataset['volume_ratio'], 'volume_ratio_of' + str(short_period) + str(long_period))
-    # hist_plot(dataset['Sharpe'], str(long_period) + '_days_Sharpe_ratio')
+    dataset = compute_features(dataset, long_period, short_period)
 
     # Create features
-    cols_features = ['long_period_return', 'short_period_return', 'volume_ratio', 'Sharpe']  #
+    cols_features = ['long_period_return', 'short_period_return',
+                     'volume_ratio', 'Sharpe']  #
     # cols_features = ['ewma','ewma_2']  #
     dataset = dataset.replace([np.inf, -np.inf], np.nan)
     dataset = dataset.dropna()
 
     # 选取训练样本，从第1000开始往前每间隔一个adjustment_period取样
     adjustment_period = 1
-    train_end_ind = 1000
+    train_end_ind = 1500
     train_index = []
     for i in range(train_end_ind, 0, -adjustment_period):
         train_index.append(i)
     train_set = dataset.iloc[train_index]
     train_set = train_set.sort_index()
     train_features = train_set[cols_features]
+
+    # hist plot
+    hist_plot(train_set['long_period_return'], str(long_period) + '_days_return')
+    hist_plot(train_set['short_period_return'], str(short_period) + '_days_return')
+    hist_plot(train_set['volume_ratio'], 'volume_ratio_of' + str(short_period) + str(long_period))
+    hist_plot(train_set['Sharpe'], str(long_period) + '_days_Sharpe_ratio')
 
     # print("train_set:\n", train_set)
 
@@ -240,15 +246,15 @@ for index in indexList:
     plot_in_sample_hidden_states(model, train_set, train_features, "close")
     # plt.savefig("../figure/hidden_states2.png", dpi=400, bbox_inches='tight')
 
-    print("Best model with {0} states ".format(str(model.n_components)))
-    print('Mean matrix:\n', model.means_)
-    print('Covariance matrix:\n', model.covars_)
-    print('Transition matrix:\n', model.transmat_)
-    # ### Modeling
+    # print("Best model with {0} states ".format(str(model.n_components)))
+    # print('Mean matrix:\n', model.means_)
+    # print('Covariance matrix:\n', model.covars_)
+    # print('Transition matrix:\n', model.transmat_)
+
+    # ### 滚动预测
     signal = []
-    for i in range(1000, dataset.shape[0] - adjustment_period, adjustment_period):
-        print(dataset.iloc[i:, :].index[0].date())
-        adjustment_period = 1
+    for i in range(train_end_ind, dataset.shape[0] - adjustment_period, adjustment_period):
+        # print(dataset.iloc[i:, :].index[0].date())
         train_end_ind = i
         train_index = []
         for j in range(train_end_ind, -1, -adjustment_period):
@@ -260,6 +266,8 @@ for index in indexList:
 
         model = get_best_hmm_model(train_features, best_state=4, max_iter=10000)
         hidden_states, expected_return = get_expected_return(model, train_set, train_features)
+        print(dataset.iloc[i:, :].index[0].date(), "current state: {}".format(hidden_states[-1]) +
+              ", expected_return:{:.4f}".format(expected_return))
         threshold = train_set['return'].mean()
         # print(threshold)
 
