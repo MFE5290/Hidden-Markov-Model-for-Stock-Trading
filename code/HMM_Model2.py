@@ -158,10 +158,9 @@ future_period = 1
 long_period = 7     # long period
 short_period = 3    # short period
 
-indexList = ['CSI300', 'CSI905', 'CSI012', 'CSI032', 'CSI033',
-             'CSI034', 'CSI036', 'CSI037', 'CSI038', 'CSI039']
+indexList = ['CSI300', 'CSI905', 'CSI012', 'CSI033', 'CSI036', 'CSI037']
 
-# indexList = ['CSI300', 'CSI905', 'CSI012']            
+# indexList = ['CSI300']            
 
 
 for index in indexList:
